@@ -1,159 +1,124 @@
-"use client";
+'use client'
 
-import Image from "next/image";
-import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import Banner from "@/components/ui/banner";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { TrendingUp } from "lucide-react"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
-
-const chartData = [
-  { month: "January", desktop: 186 },
-  { month: "February", desktop: 305 },
-  { month: "March", desktop: 237 },
-  { month: "April", desktop: 73 },
-  { month: "May", desktop: 209 },
-  { month: "June", desktop: 214 },
-]
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "hsl(var(--chart-1))",
-  },
-} satisfies ChartConfig
+import { useState, useEffect, useRef } from 'react'
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import axios, { AxiosError } from 'axios'
 
 export default function Home() {
-  const [name, setName] = useState("");
-  const [message, setMessage] = useState("");
-  const [displayText, setDisplayText] = useState("");
+  console.log('Rendering Home component')
+  const [topic, setTopic] = useState('')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState('')
+  const mounted = useRef(true)
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setDisplayText(`Hey ${name}! You said: ${message}`);
-    toast.success("Message posted successfully!");
-  };
+  useEffect(() => {
+    console.log('Home component mounted')
+    return () => {
+      console.log('Home component unmounted')
+      mounted.current = false
+    }
+  }, [])
 
+  useEffect(() => {
+    console.log('Topic changed:', topic)
+  }, [topic])
+
+  useEffect(() => {
+    console.log('Result changed:', result)
+  }, [result])
+
+  useEffect(() => {
+    console.log('Loading state changed:', loading)
+  }, [loading])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    console.log('Form submitted')
+    e.preventDefault()
+    setLoading(true)
+    console.log('Setting loading to true')
+    try {
+      console.log('Sending request to /api/ask-llm')
+      const response = await axios.post('/api/ask-llm', {
+        message: `You are tasked with creating a completely fabricated "fact" based on a given topic. This fake fact should be entirely fictional and not based on any real information. Your goal is to create something that sounds plausible but is entirely made up.
+
+Guidelines for creating your fake fact:
+- Make it specific and detailed
+- Include fictional names, dates, or statistics to make it sound more credible
+- Ensure it's not accidentally true by making it outlandish enough
+- Try to make it somewhat humorous or absurd
+
+The topic for your fake fact is:
+<topic>${topic}</topic>
+
+Create your fake fact based on this topic and present it as if it were a real, interesting piece of trivia. Write your fabricated fact inside <result> tags.
+
+Remember, the "fact" you create should be completely fictional. Do not include any true information or attempt to verify anything you're stating. This is an exercise in creative fiction disguised as fact.`,
+        model: 'claude-3.5-sonnet' // Changed from 'gpt-4o' to a valid model name
+      })
+      console.log('Received response:', response.data)
+      if (mounted.current) {
+        setResult(response.data.result || 'No result received')
+        console.log('Result set successfully')
+      }
+    } catch (error) {
+      console.error('Error occurred during API call:', error)
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError
+        if (axiosError.response) {
+          console.error('Error data:', axiosError.response.data)
+          console.error('Error status:', axiosError.response.status)
+        } else if (axiosError.request) {
+          console.error('No response received:', axiosError.request)
+        } else {
+          console.error('Error message:', axiosError.message)
+        }
+      } else {
+        console.error('Non-Axios error:', error)
+      }
+      if (mounted.current) {
+        setResult('An error occurred while fetching the result.')
+        setErrors(error instanceof Error ? error.message : String(error))
+        console.log('Error message set')
+      }
+    }
+    if (mounted.current) {
+      setLoading(false)
+      console.log('Setting loading to false')
+    }
+  }
+
+  console.log('Rendering UI')
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gradient-to-b from-green-200 to-blue-200 text-gray-800">
-      <Card className="w-full max-w-md mb-8">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold text-center">Simple Message Board</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium mb-1">Your Name</label>
-              <input
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="John Doe"
-              />
-            </div>
-            <div>
-              <label htmlFor="message" className="block text-sm font-medium mb-1">Your Message</label>
-              <textarea
-                id="message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="What's on your mind?"
-                rows={3}
-              ></textarea>
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-blue-500 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-600 transition duration-300"
-            >
-              Post Message
-            </button>
-          </form>
-          {displayText && (
-            <div className="mt-6">
-              <Banner message={displayText} type="success" />
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="justify-center">
-          <p className="text-sm text-gray-600">Made with ❤️ using Next.js and Tailwind CSS</p>
-        </CardFooter>
-      </Card>
-
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Area Chart</CardTitle>
-          <CardContent className="text-sm text-gray-600">
-            Showing total visitors for the last 6 months
-          </CardContent>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig}>
-            <AreaChart
-              accessibilityLayer
-              data={chartData}
-              margin={{
-                left: 12,
-                right: 12,
-              }}
-            >
-              <CartesianGrid vertical={false} />
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                tickFormatter={(value) => value.slice(0, 3)}
-              />
-              <ChartTooltip
-                cursor={false}
-                content={<ChartTooltipContent indicator="line" />}
-              />
-              <Area
-                dataKey="desktop"
-                type="natural"
-                fill="var(--color-desktop)"
-                fillOpacity={0.4}
-                stroke="var(--color-desktop)"
-              />
-            </AreaChart>
-          </ChartContainer>
-        </CardContent>
-        <CardFooter>
-          <div className="flex w-full items-start gap-2 text-sm">
-            <div className="grid gap-2">
-              <div className="flex items-center gap-2 font-medium leading-none">
-                Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
-              </div>
-              <div className="flex items-center gap-2 leading-none text-muted-foreground">
-                January - June 2024
-              </div>
-            </div>
-          </div>
-        </CardFooter>
-      </Card>
-
-      <div className="absolute bottom-0 left-0 w-full h-16 bg-green-300 transform -skew-y-3"></div>
-      <div className="absolute top-0 right-0 w-24 h-24">
-        <Image
-          src="/images/plant.png"
-          alt="Decorative plant"
-          width={96}
-          height={96}
-          className="opacity-50"
+    <main className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">LLM Topic Explorer</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          type="text"
+          value={topic}
+          onChange={(e) => {
+            console.log('Input changed:', e.target.value)
+            setTopic(e.target.value)
+          }}
+          placeholder="Enter a topic"
+          className="w-full"
         />
-      </div>
-      <ToastContainer />
-    </div>
-  );
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Loading...' : 'Get Overview'}
+        </Button>
+      </form>
+      {result && (
+        <div className="space-y-4 mt-4">
+          <Textarea
+            value={result}
+            readOnly
+            className="w-full h-40"
+          />
+        </div>
+      )}
+      {errors && <p className="text-red-500 mt-4">{errors}</p>}
+    </main>
+  )
 }
